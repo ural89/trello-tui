@@ -3,6 +3,20 @@
 A keyboard-driven Trello client for the terminal with vim-style bindings.
 Built with Rust and [Ratatui](https://ratatui.rs).
 
+## Install
+
+**Arch Linux** — available on the AUR as [`trello-tui`](https://aur.archlinux.org/packages/trello-tui):
+
+```sh
+yay -S trello-tui   # or: paru -S trello-tui
+```
+
+**From source:**
+
+```sh
+cargo install --path .
+```
+
 ## Setup
 
 1. **API key** — create a Power-Up at <https://trello.com/power-ups/admin> and open its *API key* tab.
@@ -20,7 +34,6 @@ Built with Rust and [Ratatui](https://ratatui.rs).
    `TRELLO_API_KEY` / `TRELLO_TOKEN` environment variables override the file.
 
 ```sh
-cargo install --path .
 trello-tui --boards   # check credentials: prints your boards and exits
 trello-tui
 ```
