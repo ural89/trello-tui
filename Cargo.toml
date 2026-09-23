@@ -2,6 +2,12 @@
 name = "trello-tui"
 version = "0.1.0"
 edition = "2024"
+description = "Keyboard-driven Trello client for the terminal with vim-style bindings"
+license = "MIT"
+repository = "https://github.com/ural89/trello-tui"
+readme = "README.md"
+keywords = ["trello", "tui", "vim", "terminal", "kanban"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 anyhow = "1.0.104"
