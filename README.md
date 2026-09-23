@@ -3,6 +3,8 @@
 A keyboard-driven Trello client for the terminal with vim-style bindings.
 Built with Rust and [Ratatui](https://ratatui.rs).
 
+![Trello TUI demo](Trello-TUI.gif)
+
 ## Install
 
 **Arch Linux** — available on the AUR as [`trello-tui`](https://aur.archlinux.org/packages/trello-tui):
