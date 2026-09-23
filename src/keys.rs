@@ -21,12 +21,18 @@ pub enum Action {
     Quit,
     NewBelow,
     NewAbove,
+    /// `A`: new list after the current one.
+    NewList,
     /// `r`: edit the card name.
     Rename,
     /// `cw` / `cc`: replace the card name.
     Change,
     EditDesc,
     Archive,
+    /// `D`: delete the card permanently (asks first).
+    Delete,
+    /// `X`: archive the current list (asks first).
+    ArchiveList,
     Undo,
     MoveLeft,
     MoveRight,
@@ -138,9 +144,12 @@ impl KeyParser {
             'K' => MoveUp(n),
             'o' => NewBelow,
             'O' => NewAbove,
+            'A' => NewList,
             'r' => Rename,
             'e' => EditDesc,
             'u' => Undo,
+            'D' => Delete,
+            'X' => ArchiveList,
             '/' => Search,
             'n' => NextMatch,
             'N' => PrevMatch,
@@ -195,6 +204,8 @@ mod tests {
         assert_eq!(feed_str(&mut p, "gg"), vec![Top]);
         assert_eq!(feed_str(&mut p, "dd"), vec![Archive]);
         assert_eq!(feed_str(&mut p, "cw"), vec![Change]);
+        assert_eq!(feed_str(&mut p, "A"), vec![NewList]);
+        assert_eq!(feed_str(&mut p, "DX"), vec![Delete, ArchiveList]);
         // Invalid second key cancels the sequence.
         assert_eq!(feed_str(&mut p, "gxj"), vec![Down(1)]);
     }

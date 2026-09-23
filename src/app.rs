@@ -29,6 +29,15 @@ pub enum Msg {
         card_id: String,
         result: anyhow::Result<Card>,
     },
+    ListCreated {
+        temp_id: String,
+        result: anyhow::Result<List>,
+    },
+    /// A write with nothing to adopt locally; `what` names it in errors.
+    Written {
+        what: &'static str,
+        result: anyhow::Result<()>,
+    },
 }
 
 /// A mutation. Writes run one at a time, in order, so rapid edits to the same
@@ -43,6 +52,18 @@ pub enum Write {
     Update {
         card_id: String,
         fields: Vec<(&'static str, String)>,
+    },
+    CreateList {
+        temp_id: String,
+        board_id: String,
+        name: String,
+        pos: f64,
+    },
+    DeleteCard {
+        card_id: String,
+    },
+    ArchiveList {
+        list_id: String,
     },
 }
 
@@ -64,6 +85,23 @@ fn start_writer(client: TrelloClient, tx: UnboundedSender<Msg>) -> UnboundedSend
                     let result = client.update_card(&card_id, &fields).await;
                     Msg::CardSaved { card_id, result }
                 }
+                Write::CreateList {
+                    temp_id,
+                    board_id,
+                    name,
+                    pos,
+                } => Msg::ListCreated {
+                    temp_id,
+                    result: client.create_list(&board_id, &name, pos).await,
+                },
+                Write::DeleteCard { card_id } => Msg::Written {
+                    what: "Deleting card",
+                    result: client.delete_card(&card_id).await,
+                },
+                Write::ArchiveList { list_id } => Msg::Written {
+                    what: "Archiving list",
+                    result: client.archive_list(&list_id).await,
+                },
             };
             if tx.send(msg).is_err() {
                 break;
@@ -82,8 +120,27 @@ pub enum Screen {
 pub enum PromptKind {
     Command,
     Search,
-    NewCard { col: usize, index: usize },
-    Rename { card_id: String },
+    NewCard {
+        col: usize,
+        index: usize,
+    },
+    /// Insert the new list at column `index`.
+    NewList {
+        index: usize,
+    },
+    Rename {
+        card_id: String,
+    },
+    /// y/N question; `y` runs the action, any other key cancels.
+    Confirm {
+        question: String,
+        action: Confirm,
+    },
+}
+
+pub enum Confirm {
+    DeleteCard { card_id: String },
+    ArchiveList { list_id: String },
 }
 
 pub struct Prompt {
@@ -332,6 +389,30 @@ impl App {
                         self.reload_board();
                     }
                 }
+            }
+            Msg::ListCreated { temp_id, result } => {
+                let found = self.columns.iter().position(|c| c.list.id == temp_id);
+                match (result, found) {
+                    (Ok(list), Some(c)) => self.columns[c].list = list,
+                    (Ok(_), None) => {} // board reloaded or switched meanwhile
+                    (Err(e), found) => {
+                        if let Some(c) = found {
+                            self.columns.remove(c);
+                            if self.col > c {
+                                self.col -= 1;
+                            }
+                        }
+                        self.error(format!("Creating list failed: {e:#}"));
+                    }
+                }
+            }
+            Msg::Written { result: Ok(()), .. } => {}
+            Msg::Written {
+                what,
+                result: Err(e),
+            } => {
+                self.error(format!("{what} failed, reloaded board: {e:#}"));
+                self.reload_board();
             }
         }
     }

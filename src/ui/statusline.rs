@@ -15,7 +15,9 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 let list = app.columns.get(*col).map_or("", |c| c.list.name.as_str());
                 format!(" New card in {list}: ")
             }
+            PromptKind::NewList { .. } => " New list: ".to_string(),
             PromptKind::Rename { .. } => " Rename: ".to_string(),
+            PromptKind::Confirm { question, .. } => format!(" {question}"),
         };
         let [p, input] = Layout::horizontal([
             Constraint::Length(prefix.chars().count() as u16),

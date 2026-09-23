@@ -13,6 +13,13 @@ pub struct List {
     pub pos: f64,
 }
 
+impl List {
+    /// Lists created locally but not yet confirmed by the server.
+    pub fn is_pending(&self) -> bool {
+        self.id.starts_with("tmp-")
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct Label {
     #[serde(default)]

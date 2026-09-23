@@ -1,5 +1,5 @@
 use anyhow::{Result, bail};
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, IgnoredAny};
 
 use crate::model::{Board, Card, List};
 
@@ -95,6 +95,19 @@ impl TrelloClient {
         Self::send(req).await
     }
 
+    pub async fn create_list(&self, board_id: &str, name: &str, pos: f64) -> Result<List> {
+        let req = self
+            .http
+            .post(format!("{}/lists", self.base))
+            .query(&self.auth())
+            .form(&[
+                ("idBoard", board_id),
+                ("name", name),
+                ("pos", &pos.to_string()),
+            ]);
+        Self::send(req).await
+    }
+
     /// PUT arbitrary card fields, e.g. `[("name", "x"), ("closed", "true")]`.
     pub async fn update_card(&self, card_id: &str, fields: &[(&str, String)]) -> Result<Card> {
         let req = self
@@ -103,5 +116,24 @@ impl TrelloClient {
             .query(&self.auth())
             .form(fields);
         Self::send(req).await
+    }
+
+    /// Permanently deletes a card (archiving is `closed=true` via `update_card`).
+    pub async fn delete_card(&self, card_id: &str) -> Result<()> {
+        let req = self
+            .http
+            .delete(format!("{}/cards/{card_id}", self.base))
+            .query(&self.auth());
+        Self::send::<IgnoredAny>(req).await.map(|_| ())
+    }
+
+    /// Archives a list. Trello's API has no way to delete a list outright.
+    pub async fn archive_list(&self, list_id: &str) -> Result<()> {
+        let req = self
+            .http
+            .put(format!("{}/lists/{list_id}", self.base))
+            .query(&self.auth())
+            .form(&[("closed", "true")]);
+        Self::send::<IgnoredAny>(req).await.map(|_| ())
     }
 }

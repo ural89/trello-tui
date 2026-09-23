@@ -36,9 +36,12 @@ trello-tui
 | `Enter` | open card details / open board |
 | `Esc` / `q` | close / back to board list (`q` there quits) |
 | `o` / `O` | new card below / above (Enter adds another, Esc stops) |
+| `A` | new list after the current one (Enter adds another, Esc stops) |
 | `r` / `cw` | edit name / replace name |
 | `e` | edit description |
 | `dd` / `u` | archive card / undo archive |
+| `D` | delete card permanently (asks y/N) |
+| `X` | archive the current list and its cards (asks y/N; Trello can't delete lists) |
 | `H` / `L` | move card to previous / next list |
 | `J` / `K` | move card down / up (counts work) |
 | `/` `n` `N` | search card names, next / previous match |

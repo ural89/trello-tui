@@ -65,7 +65,8 @@ pub fn draw_detail(f: &mut Frame, area: Rect, app: &App, scroll: u16) {
             Style::new().bold(),
         ))
         .title_bottom(
-            " e edit desc · r rename · H/L move · dd archive · j/k scroll · Esc close ".dim(),
+            " e edit desc · r rename · H/L move · dd archive · D delete · j/k scroll · Esc close "
+                .dim(),
         );
     f.render_widget(Clear, area);
     f.render_widget(

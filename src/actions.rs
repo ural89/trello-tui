@@ -4,9 +4,13 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::style::Style;
 use ratatui_textarea::{CursorMove, DataCursor, TextArea, WrapMode};
 
-use crate::app::{App, DescEditor, Overlay, Prompt, PromptKind, Screen, Write};
+use ratatui::widgets::ListState;
+
+use crate::app::{
+    App, Column, Confirm, DescEditor, Overlay, Prompt, PromptKind, Screen, Write, pos_between,
+};
 use crate::keys::Action;
-use crate::model::Card;
+use crate::model::{Card, List};
 
 impl App {
     pub fn on_event(&mut self, ev: Event) {
@@ -90,9 +94,20 @@ impl App {
             }
             Action::Back if self.search.is_some() => self.search = None,
             Action::Back | Action::Close => self.show_picker(),
+            Action::NewList => {
+                let index = if self.columns.is_empty() {
+                    0
+                } else {
+                    self.col + 1
+                };
+                self.open_prompt(PromptKind::NewList { index }, "");
+            }
             Action::NewBelow | Action::NewAbove => {
                 if self.columns.is_empty() {
-                    return self.error("This board has no lists");
+                    return self.error("This board has no lists — press A to add one");
+                }
+                if self.current_column().is_some_and(|c| c.list.is_pending()) {
+                    return self.info("List is still being created…");
                 }
                 let index = match (self.row(), action) {
                     (Some(r), Action::NewBelow) => r + 1,
@@ -111,6 +126,8 @@ impl App {
             Action::Change => self.start_rename(false),
             Action::EditDesc => self.open_desc_editor(false),
             Action::Archive => self.archive_current(),
+            Action::Delete => self.confirm_delete_card(),
+            Action::ArchiveList => self.confirm_archive_list(),
             Action::Undo => self.undo_archive(),
             Action::MoveLeft => self.move_across(-1),
             Action::MoveRight => self.move_across(1),
@@ -137,6 +154,7 @@ impl App {
                 self.overlay = Overlay::None;
                 self.archive_current();
             }
+            Action::Delete => self.confirm_delete_card(),
             Action::MoveLeft => self.move_across(-1),
             Action::MoveRight => self.move_across(1),
             _ => {}
@@ -215,6 +233,38 @@ impl App {
         );
     }
 
+    fn create_list(&mut self, index: usize, name: String) {
+        let Some(board_id) = self.board.as_ref().map(|b| b.id.clone()) else {
+            return;
+        };
+        let index = index.min(self.columns.len());
+        let prev = index.checked_sub(1).map(|p| self.columns[p].list.pos);
+        let next = self.columns.get(index).map(|n| n.list.pos);
+        let pos = pos_between(prev, next);
+        let temp_id = self.next_temp_id();
+        self.columns.insert(
+            index,
+            Column {
+                list: List {
+                    id: temp_id.clone(),
+                    name: name.clone(),
+                    pos,
+                },
+                cards: Vec::new(),
+                state: ListState::default(),
+            },
+        );
+        self.col = index;
+        self.write(Write::CreateList {
+            temp_id,
+            board_id,
+            name,
+            pos,
+        });
+        // Keep adding lists to the right until Esc.
+        self.open_prompt(PromptKind::NewList { index: index + 1 }, "");
+    }
+
     fn rename_card(&mut self, card_id: &str, name: String) {
         let Some((c, r)) = self.find_card(card_id) else {
             return;
@@ -236,6 +286,71 @@ impl App {
         self.info(format!("Archived \"{}\" — press u to undo", card.name));
         self.save_card(&card.id, vec![("closed", "true".into())]);
         self.last_archived = Some(card);
+    }
+
+    fn confirm_delete_card(&mut self) {
+        let Some(card) = self.editable_card() else {
+            return;
+        };
+        self.open_prompt(
+            PromptKind::Confirm {
+                question: format!("Delete \"{}\" permanently? (y/N) ", card.name),
+                action: Confirm::DeleteCard { card_id: card.id },
+            },
+            "",
+        );
+    }
+
+    fn confirm_archive_list(&mut self) {
+        let Some(column) = self.current_column() else {
+            return;
+        };
+        if column.list.is_pending() || column.cards.iter().any(|c| c.is_pending()) {
+            return self.info("List is still being created…");
+        }
+        let question = format!(
+            "Archive list \"{}\" and its {} cards? (y/N) ",
+            column.list.name,
+            column.cards.len()
+        );
+        let list_id = column.list.id.clone();
+        self.open_prompt(
+            PromptKind::Confirm {
+                question,
+                action: Confirm::ArchiveList { list_id },
+            },
+            "",
+        );
+    }
+
+    fn run_confirmed(&mut self, action: Confirm) {
+        match action {
+            Confirm::DeleteCard { card_id } => {
+                let Some((c, r)) = self.find_card(&card_id) else {
+                    return;
+                };
+                let card = self.columns[c].cards.remove(r);
+                self.clamp_selection(c);
+                if self.overlay_is_detail() {
+                    self.overlay = Overlay::None;
+                }
+                self.info(format!("Deleted \"{}\"", card.name));
+                self.write(Write::DeleteCard { card_id });
+            }
+            Confirm::ArchiveList { list_id } => {
+                let Some(c) = self.columns.iter().position(|col| col.list.id == list_id) else {
+                    return;
+                };
+                let column = self.columns.remove(c);
+                self.col = self.col.min(self.columns.len().saturating_sub(1));
+                self.info(format!("Archived list \"{}\"", column.list.name));
+                self.write(Write::ArchiveList { list_id });
+            }
+        }
+    }
+
+    fn overlay_is_detail(&self) -> bool {
+        matches!(self.overlay, Overlay::Detail { .. })
     }
 
     fn undo_archive(&mut self) {
@@ -287,6 +402,9 @@ impl App {
             return;
         }
         let t = t as usize;
+        if self.columns[t].list.is_pending() {
+            return self.info("List is still being created…");
+        }
         let r = self.row().unwrap_or(0);
         let mut moved = self.columns[c].cards.remove(r);
         self.clamp_selection(c);
@@ -376,6 +494,19 @@ impl App {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let empty = prompt.input.lines().iter().all(|l| l.is_empty());
         let is_ex = matches!(prompt.kind, PromptKind::Command | PromptKind::Search);
+        if matches!(prompt.kind, PromptKind::Confirm { .. }) {
+            let Some(Prompt {
+                kind: PromptKind::Confirm { action, .. },
+                ..
+            }) = self.prompt.take()
+            else {
+                return;
+            };
+            if matches!(key.code, KeyCode::Char('y' | 'Y')) && !ctrl {
+                self.run_confirmed(action);
+            }
+            return;
+        }
         match key.code {
             KeyCode::Esc => self.prompt = None,
             KeyCode::Char('c') if ctrl => self.prompt = None,
@@ -413,6 +544,7 @@ impl App {
             PromptKind::NewCard { col, index } if !text.is_empty() => {
                 self.create_card(col, index, text)
             }
+            PromptKind::NewList { index } if !text.is_empty() => self.create_list(index, text),
             PromptKind::Rename { card_id } if !text.is_empty() => self.rename_card(&card_id, text),
             _ => {}
         }

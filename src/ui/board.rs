@@ -13,14 +13,16 @@ pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
         let text = if app.board_loading {
             "Loading board…"
         } else {
-            "This board has no lists."
+            "This board has no lists. Press A to add one."
         };
         f.render_widget(Paragraph::new(text).dim(), area);
         return;
     }
 
+    // The focused list is drawn at double width; the rest keep `column_width`.
     let width = app.column_width.min(area.width).max(1);
-    let visible = (area.width / width).max(1) as usize;
+    let wide = width.saturating_mul(2).min(area.width);
+    let visible = 1 + ((area.width - wide) / width) as usize;
     let len = app.columns.len();
     app.col = app.col.min(len - 1);
     if app.col < app.col_offset {
@@ -32,7 +34,17 @@ pub fn draw(f: &mut Frame, area: Rect, app: &mut App) {
     let (start, end) = (app.col_offset, (app.col_offset + visible).min(len));
     app.half_page = (area.height.saturating_sub(2) / 2).max(1) as usize;
 
-    let slots = Layout::horizontal((start..end).map(|_| Constraint::Length(width))).split(area);
+    // When lists overflow the screen, the focused one also takes the leftover
+    // (narrower than a column) so the board fills the full width.
+    let wide = if len > visible {
+        area.width - (visible as u16 - 1) * width
+    } else {
+        wide
+    };
+    let slots = Layout::horizontal(
+        (start..end).map(|ci| Constraint::Length(if ci == app.col { wide } else { width })),
+    )
+    .split(area);
     let search = app.search.as_deref();
 
     for (slot, ci) in (start..end).enumerate() {
