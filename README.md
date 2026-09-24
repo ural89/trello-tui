@@ -40,6 +40,38 @@ trello-tui --boards   # check credentials: prints your boards and exits
 trello-tui
 ```
 
+## Command line
+
+Subcommands run once and exit, so scripts and AI agents can use the board without the TUI.
+Output is tab-separated; add `--json` for JSON. Boards and lists can be given by id, name
+(case-insensitive) or a unique part of the name; `--board` defaults to `default_board`.
+Cards can be given by id, short link or URL. Errors go to stderr with a non-zero exit code.
+
+```sh
+trello-tui boards
+trello-tui lists  -b Work
+trello-tui cards  -b Work [-l "To Do"] [--json]
+trello-tui add "Fix login bug" -b Work -l "To Do" [-d "details"] [--top]   # prints id and URL
+echo "long description" | trello-tui add "Title" -l Doing -d -           # `-` reads stdin
+trello-tui show   <card> [--json]
+trello-tui edit   <card> [-n "new name"] [-d "new description"]
+trello-tui move   <card> -l Done [--top]
+trello-tui comment <card> "Done in abc123"
+trello-tui archive <card>
+```
+
+Run `trello-tui help <command>` for details.
+
+### Using it from an AI agent
+
+[`skills/trello/SKILL.md`](skills/trello/SKILL.md) teaches an agent the commands. For Claude Code, install it as a skill:
+
+```sh
+mkdir -p ~/.claude/skills && cp -r skills/trello ~/.claude/skills/
+```
+
+Other agents can read the same file: paste it into (or link it from) your `AGENTS.md` or rules file.
+
 ## Keys
 
 | Key | Action |

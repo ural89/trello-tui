@@ -4,6 +4,7 @@ use serde::de::{DeserializeOwned, IgnoredAny};
 use crate::model::{Board, Card, List};
 
 const DEFAULT_BASE: &str = "https://api.trello.com/1";
+const CARD_FIELDS: &str = "name,desc,idList,idBoard,pos,closed,labels,due,dueComplete,shortUrl";
 
 #[derive(Clone)]
 pub struct TrelloClient {
@@ -71,13 +72,7 @@ impl TrelloClient {
     pub async fn cards(&self, board_id: &str) -> Result<Vec<Card>> {
         self.get(
             &format!("/boards/{board_id}/cards"),
-            &[
-                ("filter", "open"),
-                (
-                    "fields",
-                    "name,desc,idList,pos,closed,labels,due,dueComplete,shortUrl",
-                ),
-            ],
+            &[("filter", "open"), ("fields", CARD_FIELDS)],
         )
         .await
     }
@@ -93,6 +88,31 @@ impl TrelloClient {
                 ("pos", &pos.to_string()),
             ]);
         Self::send(req).await
+    }
+
+    /// Creates a card from arbitrary fields (`idList` required); `pos` may be `top` / `bottom`.
+    pub async fn create_card_with(&self, fields: &[(&str, &str)]) -> Result<Card> {
+        let req = self
+            .http
+            .post(format!("{}/cards", self.base))
+            .query(&self.auth())
+            .form(fields);
+        Self::send(req).await
+    }
+
+    /// One card by id or short link.
+    pub async fn card(&self, card_id: &str) -> Result<Card> {
+        self.get(&format!("/cards/{card_id}"), &[("fields", CARD_FIELDS)])
+            .await
+    }
+
+    pub async fn add_comment(&self, card_id: &str, text: &str) -> Result<()> {
+        let req = self
+            .http
+            .post(format!("{}/cards/{card_id}/actions/comments", self.base))
+            .query(&self.auth())
+            .form(&[("text", text)]);
+        Self::send::<IgnoredAny>(req).await.map(|_| ())
     }
 
     pub async fn create_list(&self, board_id: &str, name: &str, pos: f64) -> Result<List> {

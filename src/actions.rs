@@ -206,6 +206,7 @@ impl App {
             name: name.clone(),
             desc: String::new(),
             id_list: list_id.clone(),
+            id_board: String::new(),
             pos: 0.0,
             closed: false,
             labels: Vec::new(),

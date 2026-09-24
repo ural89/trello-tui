@@ -1,12 +1,12 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Board {
     pub id: String,
     pub name: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct List {
     pub id: String,
     pub name: String,
@@ -20,14 +20,14 @@ impl List {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Label {
     #[serde(default)]
     pub name: String,
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Card {
     pub id: String,
@@ -35,6 +35,8 @@ pub struct Card {
     #[serde(default)]
     pub desc: String,
     pub id_list: String,
+    #[serde(default)]
+    pub id_board: String,
     pub pos: f64,
     #[serde(default)]
     pub closed: bool,
